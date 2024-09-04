@@ -1,0 +1,44 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 存於專案根目錄下的 donations.db
+datasource db {
+  provider = "sqlite"
+  url      = "file:./donations.db"
+}
+
+model income_expenditure {
+  id                             Int     @id @default(autoincrement())
+  income_expenditure             String? // 收入還是支出
+  candidate_party                String? // 擬參選人／政黨
+  election_name                  String? // 選舉名稱
+  declaration_number_year        String? // 申報序號／年度
+  transaction_date               String? // 交易日期
+  income_expenditure_category    String? // 收支科目
+  donor_recipient                String? // 捐贈者／支出對象
+  id_number                      String? // 身分證／統一編號
+  income_amount                  Float? // 收入金額
+  expenditure_amount             Float? // 支出金額
+  donation_method                String? // 捐贈方式
+  deposit_date                   String? // 存入專戶日期
+  return_treasury                String? // 返還/繳庫
+  expenditure_purpose            String? // 支出用途
+  monetary_type                  String? // 金錢類
+  address                        String? // 地址
+  contact_phone                  String? // 聯絡電話
+  disclosed_recipient            String? // 應揭露之支出對象
+  recipient_internal_name        String? // 支出對象之內部人員姓名
+  recipient_internal_title       String? // 支出對象之內部人員職稱
+  party_internal_name            String? // 政黨之內部人員姓名
+  party_internal_title           String? // 政黨之內部人員職稱
+  relationship                   String? // 關係
+  correction_note                String? // 更正註記
+  correction_date                String? // 資料更正日期
+}

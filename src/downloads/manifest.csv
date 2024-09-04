@@ -1,0 +1,4 @@
+﻿name,schema,description
+incomes.csv,schema_incomes.csv,113年總統、副總統選舉－擬參選人首次申報收入明細
+expenditures.csv,schema_expenditures.csv,113年總統、副總統選舉－擬參選人首次申報支出明細
+election_incomes and expenditures_first.csv,schema_election_incomes and expenditures_first.csv,113年總統、副總統選舉－擬參選人首次申報收支結算表

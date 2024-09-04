@@ -1,0 +1,28 @@
+-- CreateTable
+CREATE TABLE "income_expenditure" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "candidate_party" TEXT,
+    "election_name" TEXT,
+    "declaration_number_year" TEXT,
+    "transaction_date" DATETIME,
+    "income_expenditure_category" TEXT,
+    "donor_recipient" TEXT,
+    "id_number" TEXT,
+    "income_amount" REAL,
+    "expenditure_amount" REAL,
+    "donation_method" TEXT,
+    "deposit_date" DATETIME,
+    "return_treasury" TEXT,
+    "expenditure_purpose" TEXT,
+    "monetary_type" TEXT,
+    "address" TEXT,
+    "contact_phone" TEXT,
+    "disclosed_recipient" TEXT,
+    "recipient_internal_name" TEXT,
+    "recipient_internal_title" TEXT,
+    "party_internal_name" TEXT,
+    "party_internal_title" TEXT,
+    "relationship" TEXT,
+    "correction_note" TEXT,
+    "correction_date" DATETIME
+);

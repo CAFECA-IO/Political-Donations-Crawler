@@ -1,0 +1,30 @@
+{
+  "name": "political-donations-crawler",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start:crawler": "ts-node src/crawler.ts",
+    "start:import": "ts-node src/import_csv.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@prisma/client": "^5.19.1",
+    "axios": "^1.7.7",
+    "cheerio": "^1.0.0",
+    "csv-parser": "^3.0.0",
+    "puppeteer": "^23.2.1",
+    "sqlite3": "^5.1.7",
+    "unzipper": "^0.12.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.2",
+    "@types/unzipper": "^0.10.10",
+    "prisma": "^5.19.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.4"
+  }
+}
