@@ -48,6 +48,12 @@ cd Political-Donations-Crawler
 npm install
 ```
 
+#### 建立資料庫及資料表
+```bash
+npx prisma migrate reset
+```
+
+
 #### 不需另外設定 .env
 本專案 db 會存於專案目錄下的 prisma 資料夾中，不需另外設定 .env 中的 DATABASE_URL
 
@@ -63,4 +69,6 @@ npm run start:crawler
 ```bash
 npm run start:import
 ```
-此指令會執行 import_csv.ts 檔案，將 src/downloads 資料夾中的 incomes.csv 及 expenditures.csv 檔案資料解析後存入至專案目錄下的 prisma 資料夾中的 db 中。會先執行「支出資料」再執行「收入資料」，成功解析完成後會看到「支出資料匯入完成」、「收入資料匯入完成」提示。
+資料庫使用 sqlite，此指令會執行 import_csv.ts 檔案，將 src/downloads 資料夾中的 incomes.csv 及 expenditures.csv 檔案資料解析後存入至專案目錄下的 prisma 資料夾中的 db 中。會先執行「支出資料」再執行「收入資料」，成功解析完成後會看到「支出資料匯入完成」、「收入資料匯入完成」提示。
+
+解析完成後即可於 donations.db 中查看資料庫的資料。
