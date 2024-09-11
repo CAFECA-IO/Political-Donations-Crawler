@@ -63,12 +63,16 @@ npx prisma migrate reset
 npm run start:crawler
 ```
 此指令會執行 crawler.ts 檔案，自動於[監察院政治獻金公開查閱平台](https://ardata.cy.gov.tw/home)中之「選舉查詢」輸入關鍵字「113年總統、副總統選舉」查詢，並將查詢結果之「會計報告書下載」.CSV 壓縮檔
-下載及解壓縮存入專案目錄下的  src/downloads 資料夾中。成功執行後會看到「爬取資料並解壓縮完成！」提示。
+下載及解壓縮存入專案目錄下的  src/downloads 資料夾中。
+
+成功執行後會看到「爬取資料並解壓縮完成！」提示。
 
 - 2. 匯入爬蟲資料
 ```bash
 npm run start:import
 ```
-資料庫使用 sqlite，此指令會執行 import_csv.ts 檔案，將 src/downloads 資料夾中的 incomes.csv 及 expenditures.csv 檔案資料解析後存入至專案目錄下的 prisma 資料夾中的 db 中。會先執行「支出資料」再執行「收入資料」，成功解析完成後會看到「支出資料匯入完成」、「收入資料匯入完成」提示。
+資料庫使用 sqlite，此指令會執行 import_csv.ts 檔案，將 src/downloads 資料夾中的 incomes.csv 及 expenditures.csv 檔案資料解析後存入至專案目錄下的 prisma 資料夾中的 db 中。會先執行「支出資料」再執行「收入資料」。
+
+成功解析完成後會看到「支出資料匯入完成」、「收入資料匯入完成」提示。
 
 解析完成後即可於 donations.db 中查看資料庫的資料。
