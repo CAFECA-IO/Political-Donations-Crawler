@@ -42,3 +42,10 @@ model income_expenditure {
   correction_note                String? // 更正註記
   correction_date                String? // 資料更正日期
 }
+
+model receipt_sync {
+  id        Int      @id @default(autoincrement())
+  startId   Int
+  endId     Int
+  syncTime  DateTime
+}
