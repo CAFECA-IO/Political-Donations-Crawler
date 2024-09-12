@@ -1,11 +1,7 @@
 import { PrismaClient } from "@prisma/client";
-import { PDFDocument, rgb } from "pdf-lib";
-import fontkit from "@pdf-lib/fontkit";
 import fs from "fs";
 import path from "path";
-import sharp from "sharp";
-import { fromPath } from "pdf2pic";
-import pdfConvert from "pdf-img-convert";
+import { createCanvas } from "canvas";
 
 const getRecords = async (
   minId?: number,
@@ -41,212 +37,195 @@ const getRecords = async (
   return records;
 };
 
+const wrapText = (
+  context: any,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  lineHeight: number
+) => {
+  let line = ""; // Info: (20240912 - tzuhan) 當前行的文字
+  for (let i = 0; i < text.length; i++) {
+    const testLine = line + text[i]; // Info: (20240912 - tzuhan) 將當前字元添加到測試行
+    const metrics = context.measureText(testLine); // Info: (20240912 - tzuhan) 測量行寬
+    const testWidth = metrics.width;
+
+    if (testWidth > maxWidth && line.length > 0) {
+      // Info: (20240912 - tzuhan) 如果當前行超過最大寬度，則繪製當前行並換行
+      context.fillText(line, x, y);
+      line = text[i]; // Info: (20240912 - tzuhan) 將當前字元作為新行的開始
+      y += lineHeight; // Info: (20240912 - tzuhan) 換行
+    } else {
+      line = testLine; // Info: (20240912 - tzuhan) 不超過寬度，繼續添加字元到行
+    }
+  }
+  // Info: (20240912 - tzuhan) 繪製最後一行
+  context.fillText(line, x, y);
+  return y; // Info: (20240912 - tzuhan) 返回新的 Y 座標
+};
+
 const generateAndSaveReceiptAsJPEG = async (record: any) => {
-  console.log(
-    `生成id: ${
-      record.id
-    } 交易的 PDF 收據..., typeof record: ${typeof record}, record: `,
-    record
-  );
+  console.log(`生成id: ${record.id} 交易的 JPEG 收據...`, record);
 
-  const pdfDoc = await PDFDocument.create();
-  pdfDoc.registerFontkit(fontkit);
+  // Info: (20240912 - tzuhan) 設定圖像大小
+  const width = 600;
+  const height = 800;
 
-  const fontBytes = fs.readFileSync(
-    path.join(__dirname, "assets/fonts/source_han_sans_tw_regular.otf")
-  );
-  const customFont = await pdfDoc.embedFont(fontBytes);
+  // Info: (20240912 - tzuhan) 創建 Canvas
+  const canvas = createCanvas(width, height);
+  const context = canvas.getContext("2d");
 
-  const page = pdfDoc.addPage([600, 800]);
-  const { width, height } = page.getSize();
-  const fontSize = 10;
+  // Info: (20240912 - tzuhan) 設置背景顏色
+  context.fillStyle = "#FFFFFF";
+  context.fillRect(0, 0, width, height);
 
-  let currentY = height - 50;
+  // Info: (20240912 - tzuhan) 設置字體和樣式
+  context.font = "14px Arial";
+  context.fillStyle = "#000000";
+
+  // Info: (20240912 - tzuhan) 畫表格邊框和標題
   const tableStartX = 50;
   const tableWidth = width - 100;
   const colWidth = tableWidth / 2;
-  const rowHeight = 25;
+  const rowHeight = 30;
+  let currentY = 100;
 
-  // Info: (20240911 - tzuhan) 繪製單元格的邊框
-  const drawCellBorder = (
-    x: number,
-    y: number,
-    width: number,
-    height: number
-  ) => {
-    page.drawRectangle({
-      x,
-      y,
-      width,
-      height,
-      borderColor: rgb(0, 0, 0),
-      borderWidth: 1,
-    });
-  };
-
-  // Info: (20240911 - tzuhan) 合併標題的單元格
+  // Info: (20240912 - tzuhan) 繪製標題
   const drawMergedTitle = (title: string, y: number) => {
-    drawCellBorder(tableStartX, y, tableWidth, rowHeight); // Info: (20240911 - tzuhan) 繪製整行的邊框
-    page.drawText(title, {
-      x: tableStartX + tableWidth / 2 - 100, // Info: (20240911 - tzuhan) 調整標題位置，使其居中
-      y: y + 8,
-      size: 12,
-      font: customFont,
-      color: rgb(0, 0, 0),
-    });
+    // Info: (20240912 - tzuhan) 畫合併單元格的邊框
+    context.strokeRect(tableStartX, y, tableWidth, rowHeight);
+    // Info: (20240912 - tzuhan) 繪製標題文字
+    context.fillText(
+      title,
+      tableStartX + tableWidth / 2 - context.measureText(title).width / 2,
+      y + 20
+    );
   };
 
-  let fields: { label: string; value: string }[] = [];
+  // Info: (20240912 - tzuhan) 繪製表格邊框和內容
+  const drawTableRow = (label: string, value: string, y: number) => {
+    const maxWidth = colWidth - 20; // Info: (20240912 - tzuhan) 單元格內容的最大寬度
+
+    // Info: (20240912 - tzuhan) 測量標籤和內容的行數
+    const labelLines = Math.ceil(context.measureText(label).width / maxWidth);
+    const valueLines = Math.ceil(context.measureText(value).width / maxWidth);
+
+    // Info: (20240912 - tzuhan) 取最大行數來計算行高
+    const rowLineCount = Math.max(labelLines, valueLines);
+    const dynamicRowHeight = rowLineCount * rowHeight;
+
+    // Info: (20240912 - tzuhan) 左邊的標籤單元格
+    context.strokeRect(tableStartX, y, colWidth, dynamicRowHeight);
+    context.fillText(label, tableStartX + 10, y + 20);
+
+    context.strokeRect(tableStartX + colWidth, y, colWidth, dynamicRowHeight);
+    const wrappedY = wrapText(
+      context,
+      value,
+      tableStartX + colWidth + 10,
+      y + 20,
+      colWidth - 20,
+      20
+    );
+
+    return dynamicRowHeight; // Info: (20240912 - tzuhan) 更新 Y 座標
+  };
+
+  let dynamicRowHeight = rowHeight;
   if (record.income_expenditure === "income") {
-    // Info: (20240911 - tzuhan) 第一行標題合併（捐贈者信息）
     drawMergedTitle("擬參選人政治獻金受贈收據（金錢部分）", currentY);
-    currentY -= rowHeight;
+    currentY += rowHeight;
 
-    // Info: (20240911 - tzuhan) 第一個表格：捐贈者信息
-    fields = [
-      { label: "支出/收入", value: "收入" },
-      { label: "捐贈者姓名", value: record.donor_recipient },
-      { label: "身分證號碼", value: record.id_number || "N/A" },
-      { label: "地址", value: record.address || "N/A" },
-      { label: "電話號碼", value: record.contact_phone || "N/A" },
-      { label: "捐贈金額", value: `新臺幣 ${record.income_amount} 元整` },
-      { label: "捐贈方式", value: record.donation_method },
-      { label: "存入專戶日期", value: record.deposit_date },
-    ];
+    // Info: (20240912 - tzuhan) 捐贈者信息表格
+    dynamicRowHeight = drawTableRow("支出/收入", "收入", currentY);
+    currentY += dynamicRowHeight;
+    dynamicRowHeight = drawTableRow("捐贈者姓名", record.donor_recipient, currentY);
+    currentY += dynamicRowHeight;
+    dynamicRowHeight = drawTableRow("身分證號碼", record.id_number || "N/A", currentY);
+    currentY += dynamicRowHeight;
+    dynamicRowHeight = drawTableRow("地址", record.address || "N/A", currentY);
+    currentY += dynamicRowHeight;
+    dynamicRowHeight = drawTableRow("電話號碼", record.contact_phone || "N/A", currentY);
+    currentY += dynamicRowHeight;
+    dynamicRowHeight = drawTableRow("捐贈金額", `新臺幣 ${record.income_amount} 元整`, currentY);
+    currentY += dynamicRowHeight;
+    dynamicRowHeight = drawTableRow("捐贈方式", record.donation_method, currentY);
+    currentY += dynamicRowHeight;
+    dynamicRowHeight = drawTableRow("存入專戶日期", record.deposit_date, currentY);
+    currentY += dynamicRowHeight;
   } else if (record.income_expenditure === "expenditure") {
-    // Info: (20240911 - tzuhan) 第一行標題合併（捐贈者信息）
     drawMergedTitle("擬參選人政治支出收據", currentY);
-    currentY -= rowHeight;
+    currentY += dynamicRowHeight;
 
-    fields = [
-      { label: "支出/收入", value: "支出" },
-      // Info: (20240911 - tzuhan) { label: "應揭露之支出對象", value: record.disclosed_recipient || "否" },
-      { label: "支出對象", value: record.donor_recipient },
-      { label: "地址", value: record.address || "N/A" },
-      { label: "電話號碼", value: record.contact_phone || "N/A" },
-      { label: "支出金額", value: `新臺幣 ${record.expenditure_amount} 元整` },
-      { label: "支出用途", value: record.expenditure_purpose || "N/A" },
-      { label: "交易日期", value: record.transaction_date },
-      { label: "返還/繳庫", value: record.return_treasury || "N/A" },
-    ];
+    dynamicRowHeight = drawTableRow("支出/收入", "支出", currentY);
+    currentY += dynamicRowHeight;
+    dynamicRowHeight = drawTableRow("支出對象", record.donor_recipient, currentY);
+    currentY += dynamicRowHeight;
+    dynamicRowHeight = drawTableRow("地址", record.address || "N/A", currentY);
+    currentY += dynamicRowHeight;
+    dynamicRowHeight = drawTableRow("電話號碼", record.contact_phone || "N/A", currentY);
+    currentY += dynamicRowHeight;
+    dynamicRowHeight = drawTableRow(
+      "支出金額",
+      `新臺幣 ${record.expenditure_amount} 元整`,
+      currentY
+    );
+    currentY += dynamicRowHeight;
+    dynamicRowHeight = drawTableRow("支出用途", record.expenditure_purpose || "N/A", currentY);
+    currentY += dynamicRowHeight;
+    dynamicRowHeight = drawTableRow("交易日期", record.transaction_date, currentY);
+    currentY += dynamicRowHeight;
+    dynamicRowHeight = drawTableRow("返還/繳庫", record.return_treasury || "N/A", currentY);
+    currentY += dynamicRowHeight;
   }
 
-  fields = [
-    ...fields,
-    { label: "收支科目", value: record.income_expenditure_category || "N/A" },
-    { label: "金錢類", value: record.monetary_type || "N/A" },
-    /** Info: (20240911 - tzuhan) 以下欄位暫時不顯示
-    { label: "內部人員姓名", value: record.recipient_internal_name || "N/A" },
-    { label: "內部人員職稱", value: record.recipient_internal_title || "N/A" },
-    { label: "政黨內部人員姓名", value: record.party_internal_name || "N/A" },
-    { label: "政黨內部人員職稱", value: record.party_internal_title || "N/A" },
-    { label: "關係", value: record.relationship || "N/A" },
-    */
-    { label: "更正註記", value: record.correction_note || "N/A" },
-    { label: "資料更正日期", value: record.correction_date || "N/A" },
-  ];
+  // Info: (20240912 - tzuhan) 收支科目、金錢類等表格
+  dynamicRowHeight = drawTableRow(
+    "收支科目",
+    record.income_expenditure_category || "N/A",
+    currentY
+  );
+  currentY += dynamicRowHeight;
+  dynamicRowHeight = drawTableRow("金錢類", record.monetary_type || "N/A", currentY);
+  currentY += dynamicRowHeight;
+  dynamicRowHeight = drawTableRow("更正註記", record.correction_note || "N/A", currentY);
+  currentY += dynamicRowHeight;
+  dynamicRowHeight = drawTableRow("資料更正日期", record.correction_date || "N/A", currentY);
+  currentY += dynamicRowHeight;
 
-  fields.forEach((field) => {
-    drawCellBorder(tableStartX, currentY, colWidth, rowHeight);
-    page.drawText(`${field.label}:`, {
-      x: tableStartX + 5,
-      y: currentY + 8,
-      size: fontSize,
-      font: customFont,
-      color: rgb(0, 0, 0),
-    });
-
-    drawCellBorder(tableStartX + colWidth, currentY, colWidth, rowHeight);
-    page.drawText(field.value, {
-      x: tableStartX + colWidth + 5,
-      y: currentY + 8,
-      size: fontSize,
-      font: customFont,
-      color: rgb(0, 0, 0),
-    });
-
-    currentY -= rowHeight;
-  });
-
-  // Info: (20240911 - tzuhan) 空一行作為分隔
-  currentY -= rowHeight;
-
-  // Info: (20240911 - tzuhan) 第二行標題合併（參選人信息）
+  // Info: (20240912 - tzuhan) 擬參選人簽章
   drawMergedTitle("擬參選人", currentY);
-  currentY -= rowHeight;
+  currentY += dynamicRowHeight;
+  dynamicRowHeight = drawTableRow("候選人/政黨", record.candidate_party, currentY);
+  currentY += dynamicRowHeight;
+  dynamicRowHeight = drawTableRow("選舉名稱", record.election_name, currentY);
+  currentY += dynamicRowHeight;
+  dynamicRowHeight = drawTableRow("申報序號/年度", record.declaration_number_year, currentY);
+  currentY += dynamicRowHeight;
 
-  // Info: (20240911 - tzuhan) 第二個表格：參選人資訊
-  const candidateFields = [
-    { label: "候選人/政黨", value: record.candidate_party },
-    { label: "選舉名稱", value: record.election_name },
-    { label: "申報序號/年度", value: record.declaration_number_year },
-  ];
+  context.fillText(
+    "擬參選人簽章：_________________",
+    tableStartX + 10,
+    currentY + 20
+  );
 
-  candidateFields.forEach((field) => {
-    drawCellBorder(tableStartX, currentY, colWidth, rowHeight);
-    page.drawText(`${field.label}:`, {
-      x: tableStartX + 5,
-      y: currentY + 8,
-      size: fontSize,
-      font: customFont,
-      color: rgb(0, 0, 0),
-    });
-
-    drawCellBorder(tableStartX + colWidth, currentY, colWidth, rowHeight);
-    page.drawText(field.value, {
-      x: tableStartX + colWidth + 5,
-      y: currentY + 8,
-      size: fontSize,
-      font: customFont,
-      color: rgb(0, 0, 0),
-    });
-
-    currentY -= rowHeight;
-  });
-
-  // Info: (20240911 - tzuhan) 添加簽名區域
-  drawCellBorder(tableStartX, currentY, colWidth * 2, rowHeight);
-  page.drawText("擬參選人簽章：_________________", {
-    x: tableStartX + 5,
-    y: currentY + 8,
-    size: fontSize,
-    font: customFont,
-    color: rgb(0, 0, 0),
-  });
-
-  // Info: (20240911 - tzuhan) 保存收據
+  // Info: (20240912 - tzuhan) 保存圖像為 JPEG
   const outputDir = path.join(__dirname, "receipts");
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
-  const pdfBytes = await pdfDoc.save();
-  const tempPdfPath = path.join(
-    outputDir,
-    `temp_receipt_${record.income_expenditure}_${record.id}.pdf`
-  );
-  fs.writeFileSync(tempPdfPath, pdfBytes);
-  // Deprecated: (20240914 - tzuhan) dev 用
-  console.log(`pdf 收據已暫存至: ${tempPdfPath}`);
-  // Info: (20240911 - tzuhan) 使用 pdf-poppler 將 PDF 轉換為 JPEG
+
   const jpegPath = path.join(
     outputDir,
     `receipt_${record.income_expenditure}_${record.id}.jpeg`
   );
 
-  try {
-    const outputImages = await pdfConvert.convert(tempPdfPath, { width: 600 });
-    fs.writeFileSync(jpegPath, outputImages[0]);
-    // Deprecated: (20240914 - tzuhan) dev 用
-    console.log(`JPEG 收據已保存至: ${jpegPath}`);
-    // fs.unlinkSync(tempPdfPath); // Info: (20240912 - tzuhan) 刪除 PDF 文件，減少空間佔用
-    // Deprecated: (20240914 - tzuhan) dev 用
-    console.log(`已刪除暫存 PDF: ${tempPdfPath}`);
-  } catch (error) {
-    // Deprecated: (20240914 - tzuhan) dev 用
-    console.error(`轉換 PDF 為 JPEG 時發生錯誤: ${error}`);
-  }
+  const buffer = canvas.toBuffer("image/jpeg");
+  fs.writeFileSync(jpegPath, buffer);
 
-
+  // Deprecated: (20240914 - tzuhan) dev 用
+  console.log(`JPEG 收據已保存至: ${jpegPath}`);
 };
 
 // Info: (20240911 - tzuhan) 新增 ReceiptSync 資料表的記錄
@@ -265,7 +244,7 @@ const recordSyncStatus = async (
 };
 
 // Info: (20240911 - tzuhan) 批次處理函數，每次處理1000筆記錄
-const batchProcessReceipts = async (batchSize = 1000, restTime = 60000) => {
+const batchProcessReceipts = async (batchSize = 1000, restTime = 5000) => {
   const prisma = new PrismaClient();
 
   const lastSyncRecord = await prisma.receipt_sync.findFirst({
@@ -280,30 +259,31 @@ const batchProcessReceipts = async (batchSize = 1000, restTime = 60000) => {
   const maxId = latestRecord?.id || 0;
 
   while (lastProcessedId < maxId) {
-    const records = await prisma.income_expenditure.findMany({
-      where: { id: { gt: lastProcessedId } },
-      orderBy: { id: "asc" },
-      take: batchSize,
-    });
+  const records = await prisma.income_expenditure.findMany({
+    where: { id: { gt: lastProcessedId } },
+    orderBy: { id: "asc" },
+    take: batchSize,
+  });
 
-    if (records.length === 0) break;
+  if (records.length === 0) break;
 
-    const startId = records[0].id;
-    const endId = records[records.length - 1].id;
+  const startId = records[0].id;
+  const endId = records[records.length - 1].id;
 
-    // Info: (20240911 - tzuhan) 處理並保存收據
-    for (let record of records) {
-      await generateAndSaveReceiptAsJPEG(record);
-    }
+  // Info: (20240911 - tzuhan) 處理並保存收據
+  for (let record of records) {
+    await generateAndSaveReceiptAsJPEG(record);
+  }
 
-    // Info: (20240911 - tzuhan) 記錄同步狀態
-    await recordSyncStatus(prisma, startId, endId);
-    lastProcessedId = endId;
+  // Info: (20240911 - tzuhan) 記錄同步狀態
+  await recordSyncStatus(prisma, startId, endId);
+  lastProcessedId = endId;
 
-    console.log(`已處理記錄範圍: ${startId} - ${endId}`);
+  // Deprecated: (20240914 - tzuhan) dev 用
+  console.log(`已處理記錄範圍: ${startId} - ${endId}`);
 
-    // Info: (20240911 - tzuhan) 每批次後休息 1 分鐘
-    await new Promise((resolve) => setTimeout(resolve, restTime));
+  // Info: (20240911 - tzuhan) 每批次後休息 1 分鐘
+  await new Promise((resolve) => setTimeout(resolve, restTime));
   }
 
   console.log("所有資料處理完畢。");
@@ -328,5 +308,5 @@ const clearReceiptSyncTable = async () => {
 };
 
 /** Info: (20240912 - tzuhan) 調用清空函數
-clearReceiptSyncTable();
-*/
+ clearReceiptSyncTable();
+ */
