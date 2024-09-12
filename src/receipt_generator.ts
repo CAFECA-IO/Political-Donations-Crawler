@@ -3,6 +3,9 @@ import { PDFDocument, rgb } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import fs from "fs";
 import path from "path";
+import sharp from "sharp";
+import { fromPath } from "pdf2pic";
+import pdfConvert from "pdf-img-convert";
 
 const getRecords = async (
   minId?: number,
@@ -38,9 +41,11 @@ const getRecords = async (
   return records;
 };
 
-const generateAndSaveReceipt = async (record: any) => {
+const generateAndSaveReceiptAsJPEG = async (record: any) => {
   console.log(
-    `生成id: ${record.id} 交易的 PDF 收據..., typeof record: ${typeof record}, record: `,
+    `生成id: ${
+      record.id
+    } 交易的 PDF 收據..., typeof record: ${typeof record}, record: `,
     record
   );
 
@@ -214,18 +219,42 @@ const generateAndSaveReceipt = async (record: any) => {
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
-  const outputPath = path.join(outputDir, `receipt_${record.income_expenditure
-    
-  }_${record.id}.pdf`);
   const pdfBytes = await pdfDoc.save();
-  fs.writeFileSync(outputPath, pdfBytes);
+  const tempPdfPath = path.join(
+    outputDir,
+    `temp_receipt_${record.income_expenditure}_${record.id}.pdf`
+  );
+  fs.writeFileSync(tempPdfPath, pdfBytes);
+  // Deprecated: (20240914 - tzuhan) dev 用
+  console.log(`pdf 收據已暫存至: ${tempPdfPath}`);
+  // Info: (20240911 - tzuhan) 使用 pdf-poppler 將 PDF 轉換為 JPEG
+  const jpegPath = path.join(
+    outputDir,
+    `receipt_${record.income_expenditure}_${record.id}.jpeg`
+  );
 
-  console.log(`收入收據已保存至: ${outputPath}`);
+  try {
+    const outputImages = await pdfConvert.convert(tempPdfPath, { width: 600 });
+    fs.writeFileSync(jpegPath, outputImages[0]);
+    // Deprecated: (20240914 - tzuhan) dev 用
+    console.log(`JPEG 收據已保存至: ${jpegPath}`);
+    // fs.unlinkSync(tempPdfPath); // Info: (20240912 - tzuhan) 刪除 PDF 文件，減少空間佔用
+    // Deprecated: (20240914 - tzuhan) dev 用
+    console.log(`已刪除暫存 PDF: ${tempPdfPath}`);
+  } catch (error) {
+    // Deprecated: (20240914 - tzuhan) dev 用
+    console.error(`轉換 PDF 為 JPEG 時發生錯誤: ${error}`);
+  }
+
+
 };
 
-
 // Info: (20240911 - tzuhan) 新增 ReceiptSync 資料表的記錄
-const recordSyncStatus = async (prisma: PrismaClient, startId: number, endId: number) => {
+const recordSyncStatus = async (
+  prisma: PrismaClient,
+  startId: number,
+  endId: number
+) => {
   await prisma.receipt_sync.create({
     data: {
       startId,
@@ -236,14 +265,13 @@ const recordSyncStatus = async (prisma: PrismaClient, startId: number, endId: nu
 };
 
 // Info: (20240911 - tzuhan) 批次處理函數，每次處理1000筆記錄
-const batchProcessReceipts = async (batchSize = 1000) => {
+const batchProcessReceipts = async (batchSize = 1000, restTime = 60000) => {
   const prisma = new PrismaClient();
 
   const lastSyncRecord = await prisma.receipt_sync.findFirst({
     orderBy: { endId: "desc" },
   });
   let lastProcessedId = lastSyncRecord?.endId || 0; // Info: (20240911 - tzuhan) 從已同步的最大 endId 開始處理
-
 
   // Info: (20240911 - tzuhan) 找到資料庫中最新的 income_expenditure id
   const latestRecord = await prisma.income_expenditure.findFirst({
@@ -265,7 +293,7 @@ const batchProcessReceipts = async (batchSize = 1000) => {
 
     // Info: (20240911 - tzuhan) 處理並保存收據
     for (let record of records) {
-      await generateAndSaveReceipt(record);
+      await generateAndSaveReceiptAsJPEG(record);
     }
 
     // Info: (20240911 - tzuhan) 記錄同步狀態
@@ -275,7 +303,7 @@ const batchProcessReceipts = async (batchSize = 1000) => {
     console.log(`已處理記錄範圍: ${startId} - ${endId}`);
 
     // Info: (20240911 - tzuhan) 每批次後休息 1 分鐘
-    await new Promise((resolve) => setTimeout(resolve, 60000));
+    await new Promise((resolve) => setTimeout(resolve, restTime));
   }
 
   console.log("所有資料處理完畢。");
@@ -285,4 +313,20 @@ const batchProcessReceipts = async (batchSize = 1000) => {
 // Info: (20240911 - tzuhan) 啟動批次處理
 batchProcessReceipts();
 
+const clearReceiptSyncTable = async () => {
+  const prisma = new PrismaClient();
+  try {
+    await prisma.receipt_sync.deleteMany({});
+    // Deprecated: (20240914 - tzuhan) dev 用
+    console.log("receipt_sync 表已清空。");
+  } catch (error) {
+    // Deprecated: (20240914 - tzuhan) dev 用
+    console.error("清空 receipt_sync 表時發生錯誤:", error);
+  } finally {
+    await prisma.$disconnect();
+  }
+};
 
+/** Info: (20240912 - tzuhan) 調用清空函數
+clearReceiptSyncTable();
+*/
