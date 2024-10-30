@@ -210,8 +210,13 @@ const generateAndSaveReceiptAsJPEG = async (record: any) => {
     currentY + 20
   );
 
-  // Info: (20240912 - tzuhan) 保存圖像為 JPEG
-  const outputDir = path.join(__dirname, "receipts");
+
+  // Info: (20241028 - tzuhan) 根據收入或支出分類到相應資料夾，並按候選人分開
+  const folderType = record.income_expenditure === "income" ? "收入" : "支出";
+  const candidateFolder = record.candidate_party || "unknown_candidate";
+  const outputDir = path.join(__dirname, "收據", folderType, candidateFolder);
+
+  // Info: (20241028 - tzuhan) 確保資料夾存在
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
@@ -221,10 +226,11 @@ const generateAndSaveReceiptAsJPEG = async (record: any) => {
     `receipt_${record.income_expenditure}_${record.id}.jpeg`
   );
 
+  // Info: (20241028 - tzuhan) 保存圖像為 JPEG
   const buffer = canvas.toBuffer("image/jpeg");
   fs.writeFileSync(jpegPath, buffer);
 
-  // Deprecated: (20240914 - tzuhan) dev 用
+  // Info: (20241028 - tzuhan) Deprecated: (20240914 - tzuhan) dev 用
   console.log(`JPEG 收據已保存至: ${jpegPath}`);
 };
 
@@ -293,20 +299,3 @@ const batchProcessReceipts = async (batchSize = 1000, restTime = 5000) => {
 // Info: (20240911 - tzuhan) 啟動批次處理
 batchProcessReceipts();
 
-const clearReceiptSyncTable = async () => {
-  const prisma = new PrismaClient();
-  try {
-    await prisma.receipt_sync.deleteMany({});
-    // Deprecated: (20240914 - tzuhan) dev 用
-    console.log("receipt_sync 表已清空。");
-  } catch (error) {
-    // Deprecated: (20240914 - tzuhan) dev 用
-    console.error("清空 receipt_sync 表時發生錯誤:", error);
-  } finally {
-    await prisma.$disconnect();
-  }
-};
-
-/** Info: (20240912 - tzuhan) 調用清空函數
- clearReceiptSyncTable();
- */

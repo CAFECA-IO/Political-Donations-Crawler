@@ -5,6 +5,8 @@
   "scripts": {
     "start:crawler": "ts-node src/crawler.ts",
     "start:import": "ts-node src/import_csv.ts",
+    "start:generate": "ts-node src/receipt_generator.ts",
+    "start:clear-sync": "ts-node src/clear_sync.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
